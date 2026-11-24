@@ -69,6 +69,21 @@ Tu peux créer plusieurs cartes (bouton +), par exemple une pro et une perso. Ch
 - Changer l'identifiant d'une carte change son lien. Une puce déjà écrite pointerait alors vers l'ancien lien.
 - Les images sont redimensionnées automatiquement : 420 px pour le logo, 1100 px pour le fond.
 
+## Application Android (APK)
+
+L'app existe aussi en APK installable, qui tourne en local sur le téléphone : l'éditeur est embarqué dans l'application, et l'écriture NFC passe par l'API NFC native d'Android (pas besoin de Chrome). Internet reste nécessaire pour publier, pour le QR code et pour les polices.
+
+- Code : dossier `android/` (WebView + pont natif `CarteNFC` dans `MainActivity.java`).
+- Compiler (sur ce PC) :
+  ```
+  cd android
+  set JAVA_HOME=C:\Program Files\Android\Android Studio\jbr
+  gradlew assembleRelease
+  ```
+  L'APK sort dans `android/app/build/outputs/apk/release/app-release.apk`. À chaque nouvelle version, augmente `versionCode` dans `android/app/build.gradle`.
+- Signature : la clé est dans `Documents\carte-nfc-signing\` (hors du dépôt). **Sauvegarde ce dossier** : sans lui, une nouvelle version ne pourra pas s'installer par-dessus l'ancienne.
+- Les cartes de l'APK et celles de la version navigateur sont stockées séparément. Pour passer de l'une à l'autre, utilise Exporter puis Importer (menu ⋮).
+
 ## Tester sur PC
 ```
 python -m http.server 8765 --directory carte-nfc

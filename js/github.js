@@ -1,4 +1,5 @@
 // Publication des cartes dans le dépôt GitHub Pages via l'API Contents.
+import { DEFAULT_REPO } from './config.js';
 
 export function guess() {
   const cfg = { owner: '', repo: '', branch: 'main', token: '', baseUrl: '' };
@@ -7,6 +8,8 @@ export function guess() {
     cfg.owner = h.split('.')[0];
     const seg = location.pathname.split('/').filter(Boolean)[0];
     cfg.repo = seg && !seg.includes('.') ? seg : h;
+  } else {
+    Object.assign(cfg, DEFAULT_REPO);
   }
   return cfg;
 }

@@ -1,9 +1,9 @@
 // Service worker : l'éditeur fonctionne hors connexion, réseau en priorité.
-const VERSION = 'cnfc-v1';
+const VERSION = 'cnfc-v2';
 const SHELL = [
   './', 'index.html', 'c.html', 'manifest.webmanifest',
   'css/app.css', 'css/card.css',
-  'js/render.js', 'js/editor.js', 'js/viewer.js', 'js/github.js', 'js/qr.js',
+  'js/render.js', 'js/editor.js', 'js/viewer.js', 'js/github.js', 'js/qr.js', 'js/config.js',
   'icons/icon.svg', 'icons/icon-192.png', 'icons/icon-512.png',
 ];
 

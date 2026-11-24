@@ -5,6 +5,9 @@ import { qrCanvas } from './qr.js';
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 
+// Pont natif exposé par l'APK Android (absent dans un navigateur).
+const native = window.CarteNFC || null;
+
 // ---------- Stockage local ----------
 const LS = { cards: 'cnfc.cards', cur: 'cnfc.current', gh: 'cnfc.github', tab: 'cnfc.tab' };
 const store = {
@@ -41,6 +44,12 @@ function toast(msg, ms = 2600) {
 }
 
 function download(blob, name) {
+  if (native) {
+    const reader = new FileReader();
+    reader.onload = () => toast(native.saveFile(name, blob.type || 'application/octet-stream', String(reader.result).split(',')[1]), 4000);
+    reader.readAsDataURL(blob);
+    return;
+  }
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
   a.download = name;
@@ -399,7 +408,7 @@ design.addEventListener('change', async e => {
 // ---------- Onglet Partager ----------
 const publicUrl = (c = card()) => { const b = gh.baseUrl(ghCfg); return b ? `${b}c.html?c=${c.id}` : null; };
 function testUrl(c = card()) {
-  const u = new URL('c.html', location.href);
+  const u = new URL('c.html', gh.baseUrl(ghCfg) || location.href);
   u.search = '';
   u.hash = 'd=' + encodeHash(c);
   return u.href;
@@ -456,17 +465,21 @@ $('#cardId').addEventListener('change', e => {
 });
 
 async function copy(text) {
+  if (native) { native.copy(text); toast('Lien copié'); return; }
   try { await navigator.clipboard.writeText(text); toast('Lien copié'); }
   catch { prompt('Copie ce lien :', text); }
 }
+const openExternal = url => (native ? native.openUrl(url) : window.open(url, '_blank', 'noopener'));
 $('#btnCopy').addEventListener('click', () => { const u = publicUrl(); if (u) copy(u); });
-$('#btnOpen').addEventListener('click', () => { const u = publicUrl(); if (u) window.open(u, '_blank', 'noopener'); });
-$('#btnTestOpen').addEventListener('click', () => window.open(testUrl(), '_blank', 'noopener'));
+$('#btnOpen').addEventListener('click', () => { const u = publicUrl(); if (u) openExternal(u); });
+$('#btnTestOpen').addEventListener('click', () => openExternal(testUrl()));
 $('#btnTestCopy').addEventListener('click', () => copy(testUrl()));
 $('#btnShare').addEventListener('click', async () => {
   const url = publicUrl() || testUrl();
-  if (navigator.share) {
-    try { await navigator.share({ title: fullName(card().fields) || 'Ma carte de visite', url }); } catch { /* annulé */ }
+  const title = fullName(card().fields) || 'Ma carte de visite';
+  if (native) native.share(title, url);
+  else if (navigator.share) {
+    try { await navigator.share({ title, url }); } catch { /* annulé */ }
   } else copy(url);
 });
 $('#btnQrDl').addEventListener('click', () => { if (qrCv) qrCv.toBlob(b => download(b, `qr-${card().id}.png`)); });
@@ -522,7 +535,31 @@ function nfcMsg(text, kind = '') {
   $('span', m).textContent = text || '';
   $('#btnNfcCancel').hidden = kind !== 'wait';
 }
+// Côté APK : l'écriture passe par l'API NFC Android, le résultat revient via window.__cnfcNfc.
+let nativeNfcDone = null;
+window.__cnfcNfc = (kind, text) => { const done = nativeNfcDone; nativeNfcDone = null; if (done) done({ kind, text }); };
+function nativeNfc(op, url) {
+  if (nativeNfcDone) nativeNfcDone({ kind: 'cancel', text: '' });
+  return new Promise(resolve => {
+    nativeNfcDone = resolve;
+    if (op === 'write') native.nfcWrite(url); else native.nfcRead();
+  });
+}
+function showReadResult(found) {
+  const want = publicUrl();
+  if (!found.length) nfcMsg('Puce vide ou contenu non reconnu.', 'err');
+  else if (want && found.includes(want)) nfcMsg('Puce OK : elle ouvre bien cette carte.', 'ok');
+  else nfcMsg('La puce contient : ' + found.join(', '), '');
+}
+
 function nfcAvailable() {
+  if (native) {
+    const st = native.nfcState();
+    if (st === 'on') return true;
+    if (st === 'off') { nfcMsg('Le NFC est désactivé : active-le dans les paramètres qui viennent de s\'ouvrir, puis réessaie.', 'err'); native.nfcSettings(); }
+    else nfcMsg('Ce téléphone n\'a pas de puce NFC. Utilise le QR code.', 'err');
+    return false;
+  }
   if ('NDEFReader' in window) return true;
   nfcMsg(window.isSecureContext
     ? 'Ce navigateur ne gère pas le NFC. Ouvre l\'application dans Chrome sur Android.'
@@ -541,6 +578,13 @@ $('#btnNfcWrite').addEventListener('click', async () => {
   const url = publicUrl();
   if (!url) return nfcMsg('Configure GitHub avant d\'écrire la puce : elle doit pointer vers le lien public définitif.', 'err');
   if (!card().publishedAt) toast('Attention : la carte n\'est pas encore publiée', 4000);
+  if (native) {
+    nfcMsg('Approche la puce du dos du téléphone...', 'wait');
+    const r = await nativeNfc('write', url);
+    if (r.kind === 'ok') nfcMsg('Puce programmée : ' + r.text, 'ok');
+    else if (r.kind === 'err') nfcMsg(r.text, 'err');
+    return;
+  }
   nfcCtl?.abort();
   nfcCtl = new AbortController();
   nfcMsg('Approche la puce du dos du téléphone...', 'wait');
@@ -554,6 +598,13 @@ $('#btnNfcWrite').addEventListener('click', async () => {
 });
 $('#btnNfcRead').addEventListener('click', async () => {
   if (!nfcAvailable()) return;
+  if (native) {
+    nfcMsg('Approche la puce à vérifier...', 'wait');
+    const r = await nativeNfc('read');
+    if (r.kind === 'ok') showReadResult(r.text ? r.text.split('\n') : []);
+    else if (r.kind === 'err') nfcMsg(r.text, 'err');
+    return;
+  }
   nfcCtl?.abort();
   const ctl = nfcCtl = new AbortController();
   const reader = new window.NDEFReader();
@@ -563,18 +614,19 @@ $('#btnNfcRead').addEventListener('click', async () => {
     reader.onreading = ev => {
       ctl.abort();
       if (nfcCtl === ctl) nfcCtl = null;
-      const found = ev.message.records
+      showReadResult(ev.message.records
         .filter(r => ['url', 'absolute-url', 'text'].includes(r.recordType))
-        .map(r => new TextDecoder(r.encoding || 'utf-8').decode(r.data));
-      const want = publicUrl();
-      if (!found.length) nfcMsg('Puce vide ou contenu non reconnu.', 'err');
-      else if (want && found.includes(want)) nfcMsg('Puce OK : elle ouvre bien cette carte.', 'ok');
-      else nfcMsg('La puce contient : ' + found.join(', '), '');
+        .map(r => new TextDecoder(r.encoding || 'utf-8').decode(r.data)));
     };
     reader.onreadingerror = () => nfcMsg('Lecture impossible, réessaie.', 'err');
   } catch (err) { nfcMsg(nfcError(err), 'err'); }
 });
-$('#btnNfcCancel').addEventListener('click', () => { nfcCtl?.abort(); nfcCtl = null; nfcMsg(''); });
+$('#btnNfcCancel').addEventListener('click', () => {
+  if (native) { native.nfcCancel(); window.__cnfcNfc('cancel', ''); }
+  nfcCtl?.abort();
+  nfcCtl = null;
+  nfcMsg('');
+});
 
 // ---------- Démarrage ----------
 $$('[data-icon]').forEach(el => el.insertAdjacentHTML('afterbegin', icon(el.dataset.icon)));
@@ -583,6 +635,6 @@ let startTab = 'preview';
 try { startTab = sessionStorage.getItem(LS.tab) || 'preview'; } catch { /* ignore */ }
 setTab(startTab);
 
-if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {
+if (!native && 'serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {
   navigator.serviceWorker.register('sw.js').catch(() => {});
 }
