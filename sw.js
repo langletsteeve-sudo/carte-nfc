@@ -1,0 +1,31 @@
+// Service worker : l'éditeur fonctionne hors connexion, réseau en priorité.
+const VERSION = 'cnfc-v1';
+const SHELL = [
+  './', 'index.html', 'c.html', 'manifest.webmanifest',
+  'css/app.css', 'css/card.css',
+  'js/render.js', 'js/editor.js', 'js/viewer.js', 'js/github.js', 'js/qr.js',
+  'icons/icon.svg', 'icons/icon-192.png', 'icons/icon-512.png',
+];
+
+self.addEventListener('install', e => {
+  e.waitUntil(caches.open(VERSION).then(c => c.addAll(SHELL)).then(() => self.skipWaiting()));
+});
+
+self.addEventListener('activate', e => {
+  e.waitUntil(caches.keys()
+    .then(keys => Promise.all(keys.filter(k => k !== VERSION).map(k => caches.delete(k))))
+    .then(() => self.clients.claim()));
+});
+
+self.addEventListener('fetch', e => {
+  const url = new URL(e.request.url);
+  if (e.request.method !== 'GET' || url.origin !== location.origin || url.pathname.includes('/cards/')) return;
+  e.respondWith(
+    fetch(e.request)
+      .then(res => {
+        if (res.ok) { const copy = res.clone(); caches.open(VERSION).then(c => c.put(e.request, copy)); }
+        return res;
+      })
+      .catch(() => caches.match(e.request, { ignoreSearch: true }))
+  );
+});

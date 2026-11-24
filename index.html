@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0f172a">
+<title>Carte NFC</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<link rel="stylesheet" href="css/card.css">
+<link rel="stylesheet" href="css/app.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js" defer></script>
+<script type="module" src="js/editor.js"></script>
+</head>
+<body data-tab="preview">
+
+<header class="topbar">
+  <select id="cardSelect" aria-label="Carte active"></select>
+  <button class="ibtn" id="btnNew" type="button" title="Nouvelle carte" data-icon="plus"></button>
+  <details class="menu" id="menu">
+    <summary class="ibtn" title="Plus d'options" data-icon="more"></summary>
+    <div class="menu-pop">
+      <button type="button" data-act="dup">Dupliquer cette carte</button>
+      <button type="button" data-act="export">Exporter une sauvegarde</button>
+      <button type="button" data-act="import">Importer une sauvegarde</button>
+      <button type="button" data-act="del" class="danger">Supprimer cette carte</button>
+    </div>
+  </details>
+  <input type="file" id="importFile" accept="application/json,.json" hidden>
+</header>
+
+<main class="layout">
+  <section class="preview-pane" id="previewPane"><div id="preview"></div></section>
+
+  <section class="panel" id="infos"></section>
+
+  <section class="panel" id="design"></section>
+
+  <section class="panel" id="share">
+    <h2>Lien de la carte</h2>
+    <label class="fld"><span>Identifiant (fin du lien)</span>
+      <input id="cardId" autocapitalize="none" autocomplete="off" spellcheck="false"></label>
+    <div class="urlbox"><code id="pubUrl"></code></div>
+    <p class="status" id="pubStatus"></p>
+    <div class="row">
+      <button class="btn primary" id="btnPublish" type="button">Publier / mettre à jour</button>
+      <button class="btn" id="btnCopy" type="button">Copier</button>
+      <button class="btn" id="btnOpen" type="button">Ouvrir</button>
+    </div>
+    <p class="hint">Tout ce qui figure sur la carte devient public à ce lien.</p>
+
+    <h2>Puce NFC</h2>
+    <p class="hint">Écris le lien une seule fois sur la puce. Les modifications publiées ensuite s'afficheront sans la reprogrammer.</p>
+    <div class="row">
+      <button class="btn primary" id="btnNfcWrite" type="button" data-icon="nfc">Écrire sur une puce</button>
+      <button class="btn" id="btnNfcRead" type="button">Vérifier une puce</button>
+    </div>
+    <div class="nfcmsg" id="nfcMsg" hidden><span></span><button class="btn sm" id="btnNfcCancel" type="button">Annuler</button></div>
+
+    <h2>QR code</h2>
+    <div class="qrbox" id="qrBox"></div>
+    <p class="hint center" id="qrNote"></p>
+    <div class="row">
+      <button class="btn" id="btnQrDl" type="button" data-icon="download">Télécharger le QR</button>
+      <button class="btn" id="btnShare" type="button" data-icon="share">Partager le lien</button>
+    </div>
+
+    <details class="acc">
+      <summary>Lien de test sans publier</summary>
+      <div class="acc-body">
+        <p class="hint">Les infos sont contenues dans le lien lui-même, sans logo ni image. Pratique pour essayer avant de configurer GitHub. Ne l'écris pas sur une puce : il change à chaque modification.</p>
+        <div class="row">
+          <button class="btn" id="btnTestOpen" type="button">Ouvrir la page publique</button>
+          <button class="btn" id="btnTestCopy" type="button">Copier</button>
+        </div>
+      </div>
+    </details>
+
+    <details class="acc" id="ghAcc">
+      <summary>Réglages GitHub</summary>
+      <div class="acc-body">
+        <label class="fld"><span>Propriétaire (ton nom d'utilisateur GitHub)</span><input data-gh="owner" autocapitalize="none" autocomplete="off" spellcheck="false"></label>
+        <label class="fld"><span>Dépôt</span><input data-gh="repo" autocapitalize="none" autocomplete="off" spellcheck="false" placeholder="carte-nfc"></label>
+        <label class="fld"><span>Branche</span><input data-gh="branch" autocapitalize="none" autocomplete="off" spellcheck="false" placeholder="main"></label>
+        <label class="fld"><span>Token (fine-grained, Contents : Read and write, ce dépôt seulement)</span><input data-gh="token" type="password" autocomplete="off" spellcheck="false"></label>
+        <label class="fld"><span>Adresse publique (optionnel, domaine perso)</span><input data-gh="baseUrl" autocapitalize="none" autocomplete="off" spellcheck="false" placeholder="https://cartes.mondomaine.fr/"></label>
+        <div class="row"><button class="btn" id="btnGhTest" type="button">Tester la connexion</button></div>
+        <p class="hint">Le token reste enregistré uniquement sur ce téléphone. Limite-le à ce seul dépôt.</p>
+      </div>
+    </details>
+  </section>
+</main>
+
+<nav class="tabs" id="tabs">
+  <button type="button" data-t="preview" data-icon="eye">Aperçu</button>
+  <button type="button" data-t="infos" data-icon="pencil">Infos</button>
+  <button type="button" data-t="design" data-icon="palette">Design</button>
+  <button type="button" data-t="share" data-icon="nfc">Partager</button>
+</nav>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+</body>
+</html>
